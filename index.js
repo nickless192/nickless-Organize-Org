@@ -35,6 +35,8 @@ const promptNewDepartment = () => {
     ]);
 };
 
+
+
 const promptNewRole = (departmentName) => {
     // const departmentArray = viewDepartments().then(response => {
     //     console.log([response.data]);
