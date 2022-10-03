@@ -12,7 +12,7 @@ const promptUser = () => {
             name: 'selection',
             message: 'What would you like to do? (Use arroy keys)',
             choices: ['View all Employees', 'Add Employee', 'Update Employee Role', 'View all roles', 'Add Role', 'View All Departments', 'Add Department', 'Quit'],
-    
+
         }
     ]);
 };
@@ -23,19 +23,60 @@ const promptNewDepartment = () => {
             type: 'text',
             name: 'departmentName',
             message: 'What is the name of the department',
-            validate: departmentNameInput  => {
+            validate: departmentNameInput => {
                 if (departmentNameInput) {
                     return true;
                 }
                 console.log('Input cannot be empty.');
                 return false;
             }
-    
+
         }
     ]);
 };
 
+const promptNewEmployee = (roleList, employeeIdList) => {
 
+    return inquirer.prompt([
+        {
+            type: 'text',
+            name: 'employeeFirstName',
+            message: `What is the employee's first name?`,
+            validate: employeeFirstNameInput => {
+                if (employeeFirstNameInput) {
+                    return true;
+                }
+                console.log('Input cannot be empty.');
+                return false;
+            }
+        },
+        {
+            type: 'text',
+            name: 'employeeLastName',
+            message: `What is the employee's last name?`,
+            validate: employeeLastNameInput => {
+                if (employeeLastNameInput) {
+                    return true;
+                }
+                console.log('Input cannot be empty.');
+                return false;
+            }
+        },
+        {
+            type: 'list',
+            name: 'role',
+            message: `What will be the employee's role?`,
+            choices: roleList
+        },
+        {
+            type: 'list',
+            name: 'manager_id',
+            message: `What is their manager's id?`,
+            choices: employeeIdList
+        }
+
+    ]);
+}
 
 const promptNewRole = (departmentName) => {
     // const departmentArray = viewDepartments().then(response => {
@@ -88,16 +129,31 @@ function init() {
 };
 
 const viewEmployees = () => {
-    const sql = `SELECT * FROM employees`;
-    // console.log(sql);
-    db.query(sql, (err, rows) => {
-        if (err) {
-            console.log(err.message);
-        } else {
-            console.table(rows);
-        }
-        menu();
-    });    
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT * FROM employees`;
+        // console.log(sql);
+        db.query(sql, (err, rows) => {
+            if (err) {
+                console.log(err.message);
+                reject(err);
+                return;
+            }
+            resolve({
+                ok: true,
+                data: rows
+            })
+        })
+    })
+    // const sql = `SELECT * FROM employees`;
+    // // console.log(sql);
+    // db.query(sql, (err, rows) => {
+    //     if (err) {
+    //         console.log(err.message);
+    //     } else {
+    //         console.table(rows);
+    //     }
+    //     menu();
+    // });    
 };
 
 const viewRoles = () => {
@@ -108,13 +164,13 @@ const viewRoles = () => {
                 console.log(err.message);
                 reject(err);
                 return;
-            } 
-            
+            }
+
             resolve({
                 ok: true,
                 data: rows
             });
-            
+
         });
     });
 };
@@ -127,8 +183,8 @@ const viewDepartments = async () => {
                 console.log(err.message);
                 reject(err);
                 return;
-            } 
-            
+            }
+
             resolve({
                 ok: true,
                 data: rows
@@ -139,19 +195,44 @@ const viewDepartments = async () => {
 
 const addDepartment = () => {
     promptNewDepartment()
-    .then(({departmentName}) => {
-        const sql = `INSERT INTO departments (name) VALUES (?)`;
-        const params = departmentName;
-        db.query(sql, params, (err) => {
-            if (err) {
-                console.log(err.message);
-            } else {
-                console.log(`Added ${departmentName} to the database.`);
-            }
-            menu();
+        .then(({ departmentName }) => {
+            const sql = `INSERT INTO departments (name) VALUES (?)`;
+            const params = departmentName;
+            db.query(sql, params, (err) => {
+                if (err) {
+                    console.log(err.message);
+                } else {
+                    console.log(`Added ${departmentName} to the database.`);
+                }
+                menu();
+            });
         });
-    });
 };
+
+
+const addEmployee = async () => {
+    const roleResponse = await viewRoles();
+    const employeeResponse = await viewEmployees();
+
+    const roleList = roleResponse.data.map(role => role.title);
+    const employeeList = employeeResponse.data.map(employee => employee.id);
+
+    await promptNewEmployee(roleList, employeeList)
+            .then(({ employeeFirstName, employeeLastName, role, manager_id }) => {
+            const role_id = roleList.indexOf(role) + 1;
+            const sql = `INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`
+            const params = [employeeFirstName, employeeLastName, role_id, manager_id];
+            db.query(sql, params, (err) => {
+                if (err) {
+                    console.log(err.message);
+                } else {
+                    console.log(`Added employee ${employeeFirstName} ${employeeLastName} to the database.`);
+                }
+                menu();
+            })
+        });
+
+}
 
 const addRole = () => {
     return new Promise((resolve, reject) => {
@@ -161,73 +242,79 @@ const addRole = () => {
                 console.log(err.message);
                 reject(err);
                 return;
-            } 
-            
+            }
+
             resolve({
                 ok: true,
                 data: rows
             });
         });
     })
-    .then((response) => {
-        const departmentName= response.data.map(department => department.name);
-        promptNewRole(departmentName)
-        .then(({title, salary, department_id}) => {
-            // console.log(department_id);
-            // console.log(departmentName);
-            const department_name = departmentName.indexOf(department_id);
-            // console.log(department_name);
-            const sql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`
-            const params = [title, salary, department_name];
-    
-            db.query(sql, params, (err) => {
-                if (err) {
-                    console.log(err.message);
-                } else {
-                    console.log(`Added ${title} to the database.`);
-                }
-                menu();
-            })
+        .then((response) => {
+            const departmentName = response.data.map(department => department.name);
+            promptNewRole(departmentName)
+                .then(({ title, salary, department_id }) => {
+                    // console.log(department_id);
+                    // console.log(departmentName);
+                    const department_name = departmentName.indexOf(department_id) + 1;
+                    // console.log(department_name);
+                    const sql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`
+                    const params = [title, salary, department_name];
+
+                    db.query(sql, params, (err) => {
+                        if (err) {
+                            console.log(err.message);
+                        } else {
+                            console.log(`Added ${title} to the database.`);
+                        }
+                        menu();
+                    })
+                });
         });
-    });
 
 };
 
 function menu() {
     promptUser()
-    .then (({selection}) => {
-        console.log(selection);
-        if (selection === 'View all Employees') {
-            viewEmployees();
-        } else if (selection === 'Quit') {
-            quit = true;
-            // init();
-        } else if (selection === 'View all roles') {
-            viewRoles()
-            .then( response => {
-                console.table(response.data);
-                menu();
-            });
-        } else if (selection === 'View All Departments') {
-            viewDepartments()
-            .then( response => {
-                console.table(response.data);
-                menu();
-            });
-            // menu();
-        } else if (selection === 'Add Department') {
-            addDepartment();
-        } else if (selection === 'Add Role') {
-            // addRole(response.data);
-            addRole();
-        }
-        
-    });
+        .then(({ selection }) => {
+            console.log(selection);
+            if (selection === 'View all Employees') {
+                viewEmployees()
+                    .then(response => {
+                        console.table(response.data);
+                        menu();
+                    });;
+            } else if (selection === 'Quit') {
+                quit = true;
+                // init();
+            } else if (selection === 'View all roles') {
+                viewRoles()
+                    .then(response => {
+                        console.table(response.data);
+                        menu();
+                    });
+            } else if (selection === 'View All Departments') {
+                viewDepartments()
+                    .then(response => {
+                        console.table(response.data);
+                        menu();
+                    });
+                // menu();
+            } else if (selection === 'Add Department') {
+                addDepartment();
+            } else if (selection === 'Add Role') {
+                // addRole(response.data);
+                addRole();
+            } else if (selection === 'Add Employee') {
+                addEmployee();
+            }
+
+        });
 };
 
 db.connect(err => {
     if (err) throw err;
     console.log('Database connected!');
     init();
-    
+
 });
