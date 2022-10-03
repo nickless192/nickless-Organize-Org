@@ -140,8 +140,7 @@ function init() {
 
 const viewEmployees = () => {
     return new Promise((resolve, reject) => {
-        const sql = `SELECT * FROM employees`;
-        // console.log(sql);
+        const sql = `SELECT a.id, a.first_name, a.last_name, b.title, b.salary, c.name AS department, a.manager_id FROM employees a LEFT JOIN roles b ON a.role_id = b.id LEFT JOIN departments c ON b.department_id = c.id`;
         db.query(sql, (err, rows) => {
             if (err) {
                 console.log(err.message);
@@ -154,21 +153,11 @@ const viewEmployees = () => {
             })
         })
     })
-    // const sql = `SELECT * FROM employees`;
-    // // console.log(sql);
-    // db.query(sql, (err, rows) => {
-    //     if (err) {
-    //         console.log(err.message);
-    //     } else {
-    //         console.table(rows);
-    //     }
-    //     menu();
-    // });    
 };
 
 const viewRoles = () => {
     return new Promise((resolve, reject) => {
-        const sql = `SELECT * FROM roles`;
+        const sql = `SELECT a.id, a.title, b.name AS department, a.salary FROM roles a LEFT JOIN departments b ON a.department_id = b.id`;
         db.query(sql, (err, rows) => {
             if (err) {
                 console.log(err.message);
