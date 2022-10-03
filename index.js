@@ -1,10 +1,11 @@
 const inquirer = require('inquirer');
 const db = require('./db/connection');
 const cTable = require('console.table');
-const Employees = require('./lib/Employees');
 
+// variable to track when user quits
 let quit = false;
 
+// initial prompt
 const promptUser = () => {
     return inquirer.prompt([
         {
@@ -17,6 +18,7 @@ const promptUser = () => {
     ]);
 };
 
+// prompt for new department
 const promptNewDepartment = () => {
     return inquirer.prompt([
         {
@@ -35,6 +37,7 @@ const promptNewDepartment = () => {
     ]);
 };
 
+// prompt for new employee
 const promptNewEmployee = (roleList, employeeIdList) => {
     return inquirer.prompt([
         {
@@ -77,6 +80,7 @@ const promptNewEmployee = (roleList, employeeIdList) => {
     ]);
 }
 
+// prompt for update employee's role
 const promptUpdateEmployee = (employeeList, roleList) => {
     return inquirer.prompt([
         {
@@ -94,6 +98,7 @@ const promptUpdateEmployee = (employeeList, roleList) => {
     ]);
 }
 
+// prompt for new role
 const promptNewRole = (departmentName) => {
     return inquirer.prompt([
         {
@@ -127,10 +132,10 @@ const promptNewRole = (departmentName) => {
     ]);
 }
 
-
-
+// initialization function, gets app started
 function init() {
     if (!quit) {
+        console.log("Welcome to Nickless Organize Org! Your preferred platform for employee management!")
         menu();
     } else {
         console.log("Good bye");
@@ -138,6 +143,7 @@ function init() {
     }
 };
 
+// retrieves all employees
 const viewEmployees = () => {
     return new Promise((resolve, reject) => {
         const sql = `SELECT a.id, a.first_name, a.last_name, b.title, b.salary, c.name AS department, a.manager_id FROM employees a LEFT JOIN roles b ON a.role_id = b.id LEFT JOIN departments c ON b.department_id = c.id`;
@@ -155,7 +161,8 @@ const viewEmployees = () => {
     })
 };
 
-const viewRoles = () => {
+// retrieves all roles information
+const viewRoles = async () => {
     return new Promise((resolve, reject) => {
         const sql = `SELECT a.id, a.title, b.name AS department, a.salary FROM roles a LEFT JOIN departments b ON a.department_id = b.id`;
         db.query(sql, (err, rows) => {
@@ -208,8 +215,9 @@ const addDepartment = () => {
         });
 };
 
-
+// function to add new employee
 const addEmployee = async () => {
+    // retrieves already existing roles and employee to assign role and manager for new employee
     const roleResponse = await viewRoles();
     const employeeResponse = await viewEmployees();
 
@@ -217,7 +225,8 @@ const addEmployee = async () => {
     const employeeList = employeeResponse.data.map(employee => employee.id);
 
     await promptNewEmployee(roleList, employeeList)
-            .then(({ employeeFirstName, employeeLastName, role, manager_id }) => {
+        .then(({ employeeFirstName, employeeLastName, role, manager_id }) => {
+            // map the selected role to its corresponding id
             const role_id = roleList.indexOf(role) + 1;
             const sql = `INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`
             const params = [employeeFirstName, employeeLastName, role_id, manager_id];
@@ -234,29 +243,15 @@ const addEmployee = async () => {
 }
 
 const addRole = () => {
-    return new Promise((resolve, reject) => {
-        const sql = `SELECT * FROM departments`;
-        db.query(sql, (err, rows) => {
-            if (err) {
-                console.log(err.message);
-                reject(err);
-                return;
-            }
-
-            resolve({
-                ok: true,
-                data: rows
-            });
-        });
-    })
+    // first retrieve existing departments
+    viewDepartments()
+    // then prompt for new role and pass existing departments
         .then((response) => {
             const departmentName = response.data.map(department => department.name);
             promptNewRole(departmentName)
                 .then(({ title, salary, department_id }) => {
-                    // console.log(department_id);
-                    // console.log(departmentName);
+                    // map the selected department to its corresponding id
                     const department_name = departmentName.indexOf(department_id) + 1;
-                    // console.log(department_name);
                     const sql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`
                     const params = [title, salary, department_name];
 
@@ -273,7 +268,9 @@ const addRole = () => {
 
 };
 
+// function to update employee's role
 const updateEmployee = async () => {
+    // first retrieve existing employees and roles
     const employeesResponse = await viewEmployees();
     const rolesResponse = await viewRoles();
 
@@ -281,25 +278,27 @@ const updateEmployee = async () => {
     const roleList = rolesResponse.data.map(role => role.title);
 
     promptUpdateEmployee(employeeIds, roleList)
-    .then( ({employeeId, roleName}) => {
-        const role_id = roleList.indexOf(roleName) + 1;
+        .then(({ employeeId, roleName }) => {
+            // map the selected role to its corresponding id
+            const role_id = roleList.indexOf(roleName) + 1;
 
-        const sql = `UPDATE employees SET role_id = (?) WHERE id = (?)`
-        const params = [role_id, employeeId];
+            const sql = `UPDATE employees SET role_id = (?) WHERE id = (?)`
+            const params = [role_id, employeeId];
 
-        db.query(sql, params, (err) => {
-            if (err) {
-                console.log(err.message);
-            } else {
-                console.log(`Updated employee ${employeeId} in the database.`);
-            }
-            menu();
-        })
+            db.query(sql, params, (err) => {
+                if (err) {
+                    console.log(err.message);
+                } else {
+                    console.log(`Updated employee ${employeeId} in the database.`);
+                }
+                menu();
+            })
 
-    });
-    
+        });
+
 }
 
+// main menu handler
 function menu() {
     promptUser()
         .then(({ selection }) => {
@@ -337,6 +336,7 @@ function menu() {
         });
 };
 
+// connect to db
 db.connect(err => {
     if (err) throw err;
     console.log('Database connected!');
