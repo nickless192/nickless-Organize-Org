@@ -36,7 +36,6 @@ const promptNewDepartment = () => {
 };
 
 const promptNewEmployee = (roleList, employeeIdList) => {
-
     return inquirer.prompt([
         {
             type: 'text',
@@ -78,13 +77,24 @@ const promptNewEmployee = (roleList, employeeIdList) => {
     ]);
 }
 
+const promptUpdateEmployee = (employeeList, roleList) => {
+    return inquirer.prompt([
+        {
+            type: 'list',
+            name: 'employeeId',
+            message: 'Which employee would you like to update?',
+            choices: employeeList
+        },
+        {
+            type: 'list',
+            name: 'roleName',
+            message: 'Which role would you like to assign?',
+            choices: roleList
+        }
+    ]);
+}
+
 const promptNewRole = (departmentName) => {
-    // const departmentArray = viewDepartments().then(response => {
-    //     console.log([response.data]);
-    //     return response.data;
-    // });
-    // console.log(departmentArray);
-    console.log(departmentName)
     return inquirer.prompt([
         {
             type: 'text',
@@ -274,6 +284,33 @@ const addRole = () => {
 
 };
 
+const updateEmployee = async () => {
+    const employeesResponse = await viewEmployees();
+    const rolesResponse = await viewRoles();
+
+    const employeeIds = employeesResponse.data.map(employee => employee.id);
+    const roleList = rolesResponse.data.map(role => role.title);
+
+    promptUpdateEmployee(employeeIds, roleList)
+    .then( ({employeeId, roleName}) => {
+        const role_id = roleList.indexOf(roleName) + 1;
+
+        const sql = `UPDATE employees SET role_id = (?) WHERE id = (?)`
+        const params = [role_id, employeeId];
+
+        db.query(sql, params, (err) => {
+            if (err) {
+                console.log(err.message);
+            } else {
+                console.log(`Updated employee ${employeeId} in the database.`);
+            }
+            menu();
+        })
+
+    });
+    
+}
+
 function menu() {
     promptUser()
         .then(({ selection }) => {
@@ -286,7 +323,6 @@ function menu() {
                     });;
             } else if (selection === 'Quit') {
                 quit = true;
-                // init();
             } else if (selection === 'View all roles') {
                 viewRoles()
                     .then(response => {
@@ -299,14 +335,14 @@ function menu() {
                         console.table(response.data);
                         menu();
                     });
-                // menu();
             } else if (selection === 'Add Department') {
                 addDepartment();
             } else if (selection === 'Add Role') {
-                // addRole(response.data);
                 addRole();
             } else if (selection === 'Add Employee') {
                 addEmployee();
+            } else if (selection === 'Update Employee Role') {
+                updateEmployee();
             }
 
         });
