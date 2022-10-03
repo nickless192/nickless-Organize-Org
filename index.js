@@ -35,7 +35,13 @@ const promptNewDepartment = () => {
     ]);
 };
 
-const promptNewRole = () => {
+const promptNewRole = (departmentName) => {
+    // const departmentArray = viewDepartments().then(response => {
+    //     console.log([response.data]);
+    //     return response.data;
+    // });
+    // console.log(departmentArray);
+    console.log(departmentName)
     return inquirer.prompt([
         {
             type: 'text',
@@ -63,23 +69,20 @@ const promptNewRole = () => {
             type: 'list',
             name: 'department_id',
             message: 'What department will the role be assigned to?',
-            choices: departmentArray
+            choices: departmentName
         }
     ]);
 }
 
-db.connect(err => {
-    if (err) throw err;
-    console.log('Database connected!');
-    
-});
+
 
 function init() {
     if (!quit) {
         menu();
+    } else {
+        console.log("Good bye");
+        return;
     }
-    console.log("Good bye");
-    return;
 };
 
 const viewEmployees = () => {
@@ -96,14 +99,21 @@ const viewEmployees = () => {
 };
 
 const viewRoles = () => {
-    const sql = `SELECT * FROM roles`;
-    db.query(sql, (err, rows) => {
-        if (err) {
-            console.log(err.message);
-        } else {
-            console.table(rows);
-        }
-        menu();
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT * FROM roles`;
+        db.query(sql, (err, rows) => {
+            if (err) {
+                console.log(err.message);
+                reject(err);
+                return;
+            } 
+            
+            resolve({
+                ok: true,
+                data: rows
+            });
+            
+        });
     });
 };
 
@@ -142,46 +152,80 @@ const addDepartment = () => {
 };
 
 const addRole = () => {
-    promptNewRole()
-    .then(({title, salary, department_id}) => {
-        const sql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`
-        const params = [title, salary, department_id];
-
-        db.query(sql, params, (err) => {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT * FROM departments`;
+        db.query(sql, (err, rows) => {
             if (err) {
                 console.log(err.message);
-            } else {
-                console.log(`Added ${title} to the database.`);
-            }
-        })
+                reject(err);
+                return;
+            } 
+            
+            resolve({
+                ok: true,
+                data: rows
+            });
+        });
+    })
+    .then((response) => {
+        const departmentName= response.data.map(department => department.name);
+        promptNewRole(departmentName)
+        .then(({title, salary, department_id}) => {
+            // console.log(department_id);
+            // console.log(departmentName);
+            const department_name = departmentName.indexOf(department_id);
+            // console.log(department_name);
+            const sql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`
+            const params = [title, salary, department_name];
+    
+            db.query(sql, params, (err) => {
+                if (err) {
+                    console.log(err.message);
+                } else {
+                    console.log(`Added ${title} to the database.`);
+                }
+                menu();
+            })
+        });
     });
+
 };
 
-async function menu() {
+function menu() {
     promptUser()
     .then (({selection}) => {
-        // console.log(selection);
+        console.log(selection);
         if (selection === 'View all Employees') {
             viewEmployees();
         } else if (selection === 'Quit') {
             quit = true;
             // init();
         } else if (selection === 'View all roles') {
-            viewRoles();
+            viewRoles()
+            .then( response => {
+                console.table(response.data);
+                menu();
+            });
         } else if (selection === 'View All Departments') {
             viewDepartments()
             .then( response => {
                 console.table(response.data);
-                menu()
+                menu();
             });
             // menu();
         } else if (selection === 'Add Department') {
             addDepartment();
         } else if (selection === 'Add Role') {
+            // addRole(response.data);
             addRole();
         }
         
     });
 };
 
-init();
+db.connect(err => {
+    if (err) throw err;
+    console.log('Database connected!');
+    init();
+    
+});
